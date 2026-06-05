@@ -1,0 +1,388 @@
+========================================================
+EXPLICATION DE TOUTES LES FONCTIONS NUMPY UTILISEES
+TIPE — buggy_simulation.py
+========================================================
+
+Numpy (np) est une bibliotheque Python specialisee dans le calcul
+numerique. Sa force principale est de travailler sur des TABLEAUX
+entiers en une seule instruction, sans boucle Python explicite.
+C'est beaucoup plus rapide.
+
+Exemple de la difference :
+    # Sans numpy (lent) :
+    for i in range(1000):
+        result[i] = v[i] ** 2
+
+    # Avec numpy (rapide) :
+    result = v ** 2   # applique sur tout le tableau d'un coup
+
+
+========================================================
+1. np.sqrt(x)
+========================================================
+
+    Calcule la racine carree de x.
+    Fonctionne sur un nombre ou sur un tableau entier.
+
+    Utilisations dans le code :
+
+    vg = np.sqrt(mu * g * R)
+    → Racine carree pour obtenir vg depuis vg² = mu*g*R
+
+    vr = np.sqrt((-2*h + np.sqrt(disc)) / (2*A))
+    → Deux sqrt imbriques : d'abord le discriminant, puis vr
+
+    v[i] = min(np.sqrt(v[i-1]**2 + 2*acc*ds), vmax)
+    → Racine carree de la formule cinematique v² = v0² + 2as
+
+
+========================================================
+2. np.exp(x)
+========================================================
+
+    Calcule l'exponentielle e^x.
+
+    Utilisation dans le code :
+
+    mu * (1.0 - ALPHA_SOL[sol] * np.exp(-lam / LAM_REF))
+    → Calcule exp(-lambda/lambda_ref) pour la formule mu_eff.
+      Quand lam est grand → -lam/LAM_REF est tres negatif
+      → exp tres proche de 0 → pas de penalite.
+
+
+========================================================
+3. np.array(x)
+========================================================
+
+    Convertit une liste Python en tableau numpy.
+    Permet ensuite toutes les operations vectorisees.
+
+    Utilisations dans le code :
+
+    np.array(p0)
+    → Dans catmull_rom_ferme(), convertit les points de
+      controle en tableaux pour faire des additions de vecteurs.
+
+    vmax_arr = np.array([vmax_virage(...) for i in range(N_PTS)])
+    → Convertit la liste des vmax calculees en tableau numpy
+      pour pouvoir l'utiliser efficacement ensuite.
+
+
+========================================================
+4. np.zeros(N)
+========================================================
+
+    Cree un tableau de N zeros.
+
+    Utilisations dans le code :
+
+    R = np.full(len(pts), np.inf)  # (voir np.full ci-dessous)
+    v = np.zeros(N_PTS)
+    → Initialise le tableau des vitesses a 0 avant la simulation.
+
+    dt = np.zeros(N_PTS - 1)
+    → Initialise le tableau des durees de chaque segment a 0.
+
+
+========================================================
+5. np.full(N, valeur)
+========================================================
+
+    Cree un tableau de N elements tous egaux a "valeur".
+
+    Utilisation dans le code :
+
+    R = np.full(len(pts), np.inf)
+    → Initialise tous les rayons de courbure a l'infini.
+      C'est la valeur par defaut pour une ligne droite
+      (rayon infini = pas de courbure).
+
+
+========================================================
+6. np.inf
+========================================================
+
+    Represente l'infini mathematique (+∞).
+
+    Utilisations dans le code :
+
+    R = np.full(len(pts), np.inf)
+    → Rayon infini = ligne droite.
+
+    meilleur_temps = np.inf
+    → Initialise le meilleur temps a l'infini pour que
+      le premier temps simule soit forcement meilleur.
+
+    if not np.isfinite(R) or R > 300: return V_MAX
+    → Si R est infini (ligne droite), pas de limite de virage.
+
+
+========================================================
+7. np.isfinite(x)
+========================================================
+
+    Retourne True si x est un nombre fini (ni infini ni NaN).
+
+    Utilisation dans le code :
+
+    if not np.isfinite(R) or R > 300:
+    → Verifie que le rayon de courbure est fini avant de
+      calculer vmax_virage. Si R = infini → ligne droite
+      → on retourne directement V_MAX sans calcul.
+
+    if np.isfinite(vmax_pts[i]):
+    → Dans la detection des zones de virage pour les
+      annotations, verifie si le point est en virage
+      (vmax finie) ou en ligne droite (vmax = NaN).
+
+
+========================================================
+8. np.linalg.norm(v, axis=None)
+========================================================
+
+    Calcule la norme (longueur) d'un vecteur ou de plusieurs
+    vecteurs en meme temps.
+
+    norm([dx, dy]) = sqrt(dx² + dy²)
+
+    Utilisations dans le code :
+
+    np.linalg.norm(np.diff(_tmp, axis=0), axis=1).sum()
+    → Calcule la longueur de chaque segment du circuit
+      puis les additionne → longueur totale du circuit.
+
+    DS_ARR = np.linalg.norm(np.diff(CIRCUIT, axis=0), axis=1)
+    → Calcule la distance entre chaque paire de points
+      consecutifs du circuit. axis=0 : differences entre
+      lignes. axis=1 : norme sur les colonnes (x,y).
+
+    n1 = np.linalg.norm(d1, axis=1)
+    → Norme de chaque vecteur d1 (longueur de chaque segment)
+      pour le calcul du rayon de courbure.
+
+    np.linalg.norm(pts[2:] - pts[:-2], axis=1)
+    → Longueur de la corde entre point i-1 et point i+1.
+
+
+========================================================
+9. np.diff(tableau, axis=0)
+========================================================
+
+    Calcule les differences entre elements consecutifs
+    d'un tableau.
+
+    Si tableau = [a, b, c, d]
+    np.diff(tableau) = [b-a, c-b, d-c]
+
+    Pour un tableau 2D avec axis=0 : differences entre lignes.
+
+    Utilisations dans le code :
+
+    np.diff(CIRCUIT, axis=0)
+    → Pour chaque paire de points consecutifs du circuit,
+      calcule le vecteur deplacement [dx, dy].
+      Si CIRCUIT a N points, le resultat a N-1 vecteurs.
+
+    np.diff(_tmp, axis=0)
+    → Meme chose sur le circuit temporaire pour calculer
+      le facteur d'echelle.
+
+
+========================================================
+10. np.cumsum(tableau)
+========================================================
+
+    Calcule la somme cumulee d'un tableau.
+
+    Si tableau = [1, 2, 3, 4]
+    np.cumsum(tableau) = [1, 3, 6, 10]
+
+    Utilisations dans le code :
+
+    np.cumsum(_ds) / _ds.sum()
+    → Calcule la fraction de distance parcourue en chaque
+      point du circuit. Permet d'assigner le bon type de sol
+      a chaque point selon les zones definies dans _ZONES.
+
+    DS_CUM = np.concatenate([[0], np.cumsum(DS_ARR)])
+    → Distance cumulee depuis le depart pour chaque point.
+      Utilisee comme abscisse du graphe de vitesse.
+
+
+========================================================
+11. np.concatenate([tableau1, tableau2])
+========================================================
+
+    Concatene plusieurs tableaux en un seul.
+
+    Utilisations dans le code :
+
+    _frac = np.concatenate([[0], np.cumsum(_ds) / _ds.sum()])
+    → Ajoute un 0 au debut du tableau des fractions cumulees.
+      Le premier point du circuit est a la fraction 0.
+
+    DS_CUM = np.concatenate([[0], np.cumsum(DS_ARR)])
+    → Ajoute un 0 au debut : la distance au point de depart
+      est 0. Necessaire car np.diff reduit la taille de 1.
+
+
+========================================================
+12. np.vstack([tableau1, tableau2, ...])
+========================================================
+
+    Empile des tableaux verticalement (les uns sous les autres).
+
+    Utilisation dans le code :
+
+    pts = np.vstack([segment(...) for i in range(N)])
+    → Assemble tous les segments de la spline Catmull-Rom
+      en un seul grand tableau de points (x,y).
+
+    return np.vstack([pts, pts[0]])
+    → Ferme le circuit en ajoutant le premier point a la fin.
+
+
+========================================================
+13. np.linspace(debut, fin, n, endpoint=False)
+========================================================
+
+    Genere n valeurs regulierement espacees entre debut et fin.
+    endpoint=False : n'inclut pas la valeur finale.
+
+    Utilisation dans le code :
+
+    for t in np.linspace(t1, t2, n, endpoint=False):
+    → Dans catmull_rom_ferme(), genere les n=50 valeurs
+      du parametre t pour interpoler chaque segment de
+      la spline. endpoint=False evite de dupliquer le
+      point de jonction entre deux segments.
+
+
+========================================================
+14. np.abs(x)
+========================================================
+
+    Calcule la valeur absolue de x.
+    Fonctionne element par element sur un tableau.
+
+    Utilisation dans le code :
+
+    cross = np.abs(d1[:,0]*d2[:,1] - d1[:,1]*d2[:,0])
+    → Valeur absolue du produit vectoriel 2D entre d1 et d2.
+      Le produit vectoriel peut etre negatif selon l'orientation
+      du virage (gauche ou droite). On veut toujours une aire
+      positive pour le calcul du rayon de courbure.
+
+
+========================================================
+15. np.hypot(dx, dy)
+========================================================
+
+    Calcule sqrt(dx² + dy²) de facon numeriquement stable.
+    Equivalent a la norme d'un vecteur 2D.
+
+    Utilisation dans le code :
+
+    any(np.hypot(px-ex, py-ey) < 35 for ex, ey in poses)
+    → Calcule la distance entre deux points (px,py) et (ex,ey)
+      pour verifier qu'une nouvelle etiquette n'est pas trop
+      proche d'une etiquette deja placee sur le circuit.
+
+
+========================================================
+16. Indexation avancee numpy : tableau[masque]
+========================================================
+
+    Permet de selectionner des elements d'un tableau selon
+    une condition booleenne.
+
+    mask = (cross > 1e-12) & (n1 > 1e-12) & (n2 > 1e-12)
+    → Cree un tableau de True/False selon les conditions.
+      & = ET logique element par element.
+
+    R[1:-1][mask] = n1[mask] * n2[mask] * chord[mask] / (2*cross[mask])
+    → Applique le calcul uniquement aux points valides.
+      Les points invalides (lignes droites) gardent R = infini.
+
+    R[1:-1] : sous-tableau excluant le premier et dernier point
+    (qui n'ont pas deux voisins, donc pas de rayon calculable).
+
+
+========================================================
+17. Indexation par tranches : tableau[debut:fin]
+========================================================
+
+    Selectionne une portion d'un tableau.
+
+    pts[1:-1]  → tous les points sauf le premier et le dernier
+    pts[:-2]   → tous les points sauf les deux derniers
+    pts[2:]    → tous les points a partir du troisieme
+    pts[1:-1] - pts[:-2]  → vecteurs d1 pour tous les points
+                             intermediaires en une instruction
+
+    Utilisation dans le code :
+
+    d1 = pts[1:-1] - pts[:-2]
+    d2 = pts[2:]   - pts[1:-1]
+    → Calcule tous les vecteurs d1 et d2 simultanement
+      sans boucle Python.
+
+
+========================================================
+18. tableau[:,0] et tableau[:,1]
+========================================================
+
+    Selectionne une colonne entiere d'un tableau 2D.
+    : = toutes les lignes, 0 = premiere colonne (x), 1 = y.
+
+    Utilisation dans le code :
+
+    d1[:,0]*d2[:,1] - d1[:,1]*d2[:,0]
+    → Calcule le produit vectoriel 2D pour tous les points
+      du circuit en une seule instruction.
+      Equivalent a : pour chaque i, d1[i][0]*d2[i][1] - ...
+
+    CIRCUIT[:,0].min(), CIRCUIT[:,0].max()
+    → Min et max des coordonnees x de tous les points
+      du circuit (pour placer les etiquettes dans le cadre).
+
+
+========================================================
+19. np.nan et tableau[condition] = np.nan
+========================================================
+
+    NaN = "Not a Number". Valeur speciale pour indiquer
+    une donnee manquante ou non definie.
+    Matplotlib ignore automatiquement les NaN dans les traces.
+
+    Utilisation dans le code :
+
+    vmax_pts[vmax_pts >= V_MAX * 3.6 - 0.1] = np.nan
+    → Remplace par NaN toutes les vitesses max qui sont
+      egales a V_MAX (= lignes droites, pas de virage).
+      Cela permet de detecter facilement les zones de virage
+      (valeurs finies) vs lignes droites (NaN).
+
+
+========================================================
+RESUME — POURQUOI NUMPY EST INDISPENSABLE ICI
+========================================================
+
+    Le circuit a environ 1100 points (22 points de controle
+    x 50 points par segment).
+
+    Sans numpy, calculer les rayons de courbure necessite :
+        for i in range(1, N-1):
+            dx1 = pts[i][0] - pts[i-1][0]
+            dy1 = pts[i][1] - pts[i-1][1]
+            ... (10 lignes de calcul)
+    → Lent, verbeux.
+
+    Avec numpy :
+        d1 = pts[1:-1] - pts[:-2]          # 1 ligne
+        cross = np.abs(d1[:,0]*d2[:,1]...) # 1 ligne
+        R[1:-1][mask] = n1*n2*chord/...    # 1 ligne
+    → Rapide, lisible, vectorise.
+
+    La regle generale : si tu fais la meme operation
+    sur beaucoup de nombres → utilise numpy.
