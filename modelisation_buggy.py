@@ -17,6 +17,7 @@ g     = 9.81         # gravite (m/s²)
 h     = 0.19         # hauteur centre de gravite (m)
 l     = 0.30         # demi-voie (m)
 V_MAX = 60 / 3.6     # vitesse max moteur (m/s)
+A_MOTEUR = 7.4
 
 # ============================================================
 # 2. DONNEES EXPERIMENTALES
@@ -26,8 +27,8 @@ V_MAX = 60 / 3.6     # vitesse max moteur (m/s)
 ALPHA_SOL = {"beton": 0.1, "terre": 0.4, "sable": 0.9}
 
 PNEUS = {
-    "slick":  {"mu": {"sable": 0.28, "terre": 0.75, "beton": 0.85}, "a_moteur": 7.4},
-    "sillon": {"mu": {"sable": 0.42, "terre": 0.84, "beton": 0.67}, "a_moteur": 7.4},
+    "slick":  {"mu": {"sable": 0.28, "terre": 0.75, "beton": 0.85}},
+    "sillon": {"mu": {"sable": 0.42, "terre": 0.84, "beton": 0.67}},
 }
 RESSORTS = {
     "souple": {"K": 388, "lam": 62.2},
@@ -62,7 +63,7 @@ def a_reelle(pneu, sol, ressort):
     """
     lam = RESSORTS[ressort]["lam"]
     mu  = mu_eff(PNEUS[pneu]["mu"][sol], sol, lam)
-    return min(PNEUS[pneu]["a_moteur"], mu * g)
+    return min(A_MOTEUR, mu * g)
 
 def vmax_virage(R, sol, pneu, ressort):
     """Vitesse max en virage (adherence + renversement)."""
@@ -104,12 +105,29 @@ def catmull_rom_ferme(kp, n=50):
 
 # Points de controle normalises [0,1]
 _KP_NORM = np.array([
-    [0.18, 0.50], [0.12, 0.65], [0.14, 0.80], [0.25, 0.88],
-    [0.40, 0.88], [0.55, 0.85], [0.60, 0.90], [0.65, 0.83],
-    [0.72, 0.88], [0.78, 0.82], [0.85, 0.75], [0.88, 0.65],
-    [0.85, 0.55], [0.80, 0.45], [0.86, 0.36], [0.80, 0.27],
-    [0.70, 0.20], [0.55, 0.15], [0.40, 0.18], [0.30, 0.25],
-    [0.22, 0.32], [0.20, 0.42],
+    [0.50, 0.50],  # centre départ
+    [0.42, 0.60],  # diagonale montée gauche
+    [0.30, 0.72],  # montée épingle haut-gauche
+    [0.20, 0.80],  # épingle haut-gauche entrée
+    [0.13, 0.74],  # épingle haut-gauche sommet
+    [0.16, 0.64],  # épingle haut-gauche sortie
+    [0.22, 0.55],  # grande courbe gauche haut
+    [0.18, 0.44],  # grande courbe gauche milieu
+    [0.22, 0.33],  # grande courbe gauche bas
+    [0.16, 0.24],  # épingle bas-gauche entrée
+    [0.13, 0.15],  # épingle bas-gauche sommet
+    [0.22, 0.10],  # épingle bas-gauche sortie
+    [0.35, 0.14],  # ligne droite bas
+    [0.50, 0.18],  # bas milieu
+    [0.62, 0.22],  # bas droite
+    [0.72, 0.28],  # virage bas-droite
+    [0.80, 0.38],  # chicane droite entrée
+    [0.86, 0.46],  # chicane droite sommet
+    [0.80, 0.54],  # chicane droite creux
+    [0.86, 0.62],  # chicane droite 2 sommet
+    [0.78, 0.70],  # chicane droite 2 sortie
+    [0.68, 0.62],  # retour diagonal haut
+    [0.60, 0.56],  # ligne diagonale retour
 ])
 
 # Mise a l'echelle → longueur totale ≈ 500 m
@@ -122,7 +140,7 @@ N_PTS   = len(CIRCUIT)
 _ZONES = [
     (0.00, 0.18, "beton"),
     (0.18, 0.65, "terre"),
-    (0.65, 0.85, "sable"),
+    (0.65, 0.85, "beton"),
     (0.85, 1.00, "beton"),
 ]
 _ds   = np.linalg.norm(np.diff(CIRCUIT, axis=0), axis=1)
@@ -259,7 +277,7 @@ ax_c.set_ylabel("y (m)", color="#aaaaaa")
 patches = [mpatches.Patch(color=c, label=s) for s, c in COULEURS_SOL.items()]
 patches.append(mpatches.Patch(color="#e94560", label="vmax virage"))
 ax_c.legend(handles=patches, facecolor="#0f3460", labelcolor="white", fontsize=8)
-ax_c.text(0.02, 0.98, f"Distance : {longueur_totale:.0f} m\nMeilleur Temps : {meilleur_temps:.1f} s",
+ax_c.text(0.02, 0.98, f"Distance : {longueur_totale:.0f} m\nMeilleur Temps : {meilleur_temps:.2f} s",
           transform=ax_c.transAxes, color="white", fontsize=10, fontweight="bold",
           va="top", ha="left",
           bbox=dict(facecolor="#0f3460", edgecolor="#e94560", boxstyle="round,pad=0.4", alpha=0.9))
@@ -291,7 +309,7 @@ for (row, col), cell in tbl.get_celld().items():
 tbl.scale(1, 1.3)
 
 # -- Animation vitesse --
-ax_a.set_title("Vitesse instantanee — meilleure config", color="white", fontsize=9, fontweight="bold")
+ax_a.set_title("Vitesse instantanee — Meilleure configuration", color="white", fontsize=9, fontweight="bold")
 v_kmh = resultats[meilleure_config]["v_sim"] * 3.6
 ax_a.set_xlim(0, DS_CUM[-1]); ax_a.set_ylim(0, v_kmh.max() * 1.15)
 ax_a.set_xlabel("Distance (m)", color="#aaaaaa", fontsize=8)
